@@ -79,7 +79,7 @@
             this.chart1.Series.Add(series2);
             this.chart1.Series.Add(series3);
             this.chart1.Series.Add(series4);
-            this.chart1.Size = new System.Drawing.Size(712, 184);
+            this.chart1.Size = new System.Drawing.Size(712, 204);
             this.chart1.TabIndex = 0;
             this.chart1.Text = "chart1";
             this.chart1.Click += new System.EventHandler(this.Chart1_Click);
@@ -163,7 +163,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(712, 332);
+            this.ClientSize = new System.Drawing.Size(712, 352);
             this.Controls.Add(this.cmbServerList);
             this.Controls.Add(this.txtPort);
             this.Controls.Add(this.label2);
@@ -175,7 +175,7 @@
             this.Controls.Add(this.chart1);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "Form1";
-            this.Text = "NFK Lagometer";
+            this.Text = "NFK Lagometer v0.1";
             this.Load += new System.EventHandler(this.Form1_Load);
             this.Resize += new System.EventHandler(this.Form1_Resize);
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).EndInit();
