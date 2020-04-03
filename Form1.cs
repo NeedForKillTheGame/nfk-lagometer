@@ -15,6 +15,7 @@ using System.Web.Script.Serialization;
 using System.Windows.Forms.DataVisualization.Charting;
 using System.Net.Sockets;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace NFKLagometer
 {
@@ -23,14 +24,17 @@ namespace NFKLagometer
         private static List<PingItem> pings = new List<PingItem>();
         private Random rnd = new Random();
         StripLine stripline = new StripLine();
-        private int Interval = 100;
-        private int Timeout = 300;
 
         private ushort ServerPort;
         private IPAddress ServerIP;
 
         private long PingCount = 0;
         private long PingSum = 0;
+        private long PingMin = 999;
+        private long PingMax = 0;
+        private int LostCount = 0;
+
+        byte[] pingPacket = { 0x00, 0x01, 0x05, 0x01, 0x48 };
 
         public Form1()
         {
@@ -43,7 +47,6 @@ namespace NFKLagometer
             { "code", 8 }
         };
 
-        int lostCount = 0;
         private void Timer1_Tick(object sender, EventArgs e)
         {
             bool lost = false;
@@ -51,7 +54,7 @@ namespace NFKLagometer
 
             if (lost)
             {
-                lostCount++;
+                LostCount++;
                 return;
             }
 
@@ -60,19 +63,29 @@ namespace NFKLagometer
             PingCount++;
             PingSum += lat;
 
+            if (PingMin == 0 || PingMin > lat)
+                PingMin = lat;
+            if (lat > PingMax)
+                PingMax = lat;
+
             var avgPing = PingSum / PingCount;
             stripline.IntervalOffset = avgPing;
             chart1.Series[0].Name = "Ping  " + ping.GetPing();
             chart1.Series[1].Name = "Average  " + (int)avgPing;
-            chart1.Series[2].Name = "Count  " + (int)PingCount;
-            chart1.Series[3].Name = "Lost  " + (int)lostCount;
+            chart1.Series[2].Name = "Min  " + (int)PingMin;
+            chart1.Series[3].Name = "Max  " + (int)PingMax;
+            chart1.Series[4].Name = "Count  " + (int)PingCount;
+            chart1.Series[5].Name = "Lost  " + (int)LostCount;
 
             chart1.Series[0].Points.AddXY(ping.GetTime(), ping.Ping);
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            timer1.Interval = Interval;
+            // set version
+            var ver = Assembly.GetExecutingAssembly().GetName().Version;
+            this.Text = this.Text + " v" + ver.Major + "." + ver.Minor;
+
 
             BtnReload_Click(null, null);
 
@@ -83,10 +96,12 @@ namespace NFKLagometer
             chart1.ChartAreas[0].AxisY.StripLines.Add(stripline);
 
             // set transpacency
-            chart1.Series[0].Color = Color.FromArgb(180, Color.Green);
-            chart1.Series[1].Color = stripline.BackColor;
-            chart1.Series[2].Color = Color.Transparent; // count
-            chart1.Series[3].Color = Color.Transparent; // lost
+            chart1.Series[0].Color = Color.FromArgb(180, Color.Green); // ping
+            chart1.Series[1].Color = stripline.BackColor; // avg
+            chart1.Series[2].Color = Color.Transparent; // min
+            chart1.Series[3].Color = Color.Transparent; // max
+            chart1.Series[4].Color = Color.Transparent; // count
+            chart1.Series[5].Color = Color.Transparent; // lost
         }
 
 
@@ -120,13 +135,20 @@ namespace NFKLagometer
                 btnReload.Enabled =
                     txtIp.Enabled =
                     txtPort.Enabled =
+                    numInterval.Enabled =
+                    numTimeout.Enabled =
                     cmbServerList.Enabled = false;
+
+                timer1.Interval = (int)numInterval.Value;
 
                 // reset
                 pings.Clear();
                 chart1.Series[0].Points.Clear();
                 PingCount = 0;
                 PingSum = 0;
+                PingMin = 999;
+                PingMax = 0;
+                LostCount = 0;
 
                 timer1.Enabled = true;
             }
@@ -139,6 +161,8 @@ namespace NFKLagometer
                     btnReload.Enabled =
                     txtIp.Enabled =
                     txtPort.Enabled =
+                    numInterval.Enabled =
+                    numTimeout.Enabled =
                     cmbServerList.Enabled = true;
             }
 
@@ -147,7 +171,6 @@ namespace NFKLagometer
         }
 
 
-        byte[] pingPacket = { 0x00, 0x01, 0x05, 0x01, 0x48 };
         Stopwatch sw = new Stopwatch();
 
         private int SendPing(IPAddress ip, ushort port, ref bool lost)
@@ -156,8 +179,8 @@ namespace NFKLagometer
             {
                 using (var client = new UdpClient(port))
                 {
-                    client.Client.SendTimeout = Timeout;
-                    client.Client.ReceiveTimeout = Timeout;
+                    client.Client.SendTimeout = (int)numTimeout.Value;
+                    client.Client.ReceiveTimeout = (int)numTimeout.Value;
                     var server = new IPEndPoint(ip, port);
                     sw.Restart();
                     client.Send(pingPacket, pingPacket.Length, server);
@@ -177,7 +200,7 @@ namespace NFKLagometer
             btnReload.Enabled = false;
 
             var url = "https://stats.needforkill.ru/api.php?action=gsl";
-            using (var wc = new WebClient())
+            using (var wc = new TimeoutWebClient())
             {
                 try
                 {
@@ -192,7 +215,7 @@ namespace NFKLagometer
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Error load servers from\n" + url, "API Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Error load servers from\n" + url + "\n\n" + ex.Message, "API Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }
 
